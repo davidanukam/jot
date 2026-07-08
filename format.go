@@ -12,18 +12,35 @@ func formatCommitMessage(store Store) (string, bool) {
 		mainIdx = 0
 	}
 
-	subject := store.Messages[mainIdx].Text
-	if len(store.Messages) == 1 {
-		return subject, true
-	}
-
+	mainMsg := store.Messages[mainIdx]
+	var subject string
 	var bullets []string
-	for i, msg := range store.Messages {
-		if i == mainIdx {
-			continue
+
+	if isMultiLine(mainMsg) {
+		subject = messageFirstLine(mainMsg)
+		bullets = append(bullets, subLinesForCopy(mainMsg)...)
+		for i, msg := range store.Messages {
+			if i == mainIdx {
+				continue
+			}
+			bullets = append(bullets, bulletsForOtherMessage(msg)...)
 		}
-		bullets = append(bullets, "- "+msg.Text)
+	} else {
+		subject = mainMsg.Text
+		for i, msg := range store.Messages {
+			if i == mainIdx {
+				continue
+			}
+			bullets = append(bullets, bulletsForOtherMessage(msg)...)
+		}
 	}
 
-	return subject + "\n\n" + strings.Join(bullets, "\n"), true
+	return formatQuotedCommit(subject, bullets)
+}
+
+func formatQuotedCommit(subject string, bullets []string) (string, bool) {
+	if len(bullets) == 0 {
+		return `"` + subject + `"`, true
+	}
+	return `"` + subject + "\n" + strings.Join(bullets, "\n") + `"`, true
 }

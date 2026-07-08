@@ -12,7 +12,7 @@ import (
 const version = "0.1.0"
 
 var reservedCommands = map[string]bool{
-	"show":              true,
+	"read":              true,
 	"main":              true,
 	"copy":              true,
 	"rm":                true,
@@ -21,6 +21,7 @@ var reservedCommands = map[string]bool{
 	"undo":              true,
 	"clear":             true,
 	"init":              true,
+	"write":             true,
 	"help":              true,
 	"version":           true,
 	"_post-commit-clear": true,
@@ -51,7 +52,8 @@ func main() {
 		return
 	}
 
-	os.Exit(runLog(args))
+	fmt.Fprintln(os.Stderr, `usage: jot write "message"`)
+	os.Exit(1)
 }
 
 func dispatch(args []string) int {
@@ -62,8 +64,8 @@ func dispatch(args []string) int {
 	case "version":
 		fmt.Println(version)
 		return 0
-	case "show":
-		return runShow(args[1:])
+	case "read":
+		return runRead(args[1:])
 	case "copy":
 		return runCopy(args[1:])
 	case "main":
@@ -78,6 +80,8 @@ func dispatch(args []string) int {
 		return runClear(args[1:])
 	case "init":
 		return runInit()
+	case "write":
+		return runWrite(args[1:])
 	case "_post-commit-clear":
 		return runPostCommitClear()
 	default:
@@ -95,8 +99,31 @@ func requireGitDir() (string, int) {
 	return dir, 0
 }
 
-func runLog(args []string) int {
-	text := strings.TrimSpace(strings.Join(args, " "))
+func runWrite(args []string) int {
+	noHyphen := false
+	var msgArgs []string
+	for _, a := range args {
+		if a == "--no-hyphen" {
+			noHyphen = true
+			continue
+		}
+		msgArgs = append(msgArgs, a)
+	}
+
+	if len(msgArgs) == 0 {
+		fmt.Fprintln(os.Stderr, `usage: jot write "message"`)
+		return 1
+	}
+	if len(msgArgs) > 1 {
+		fmt.Fprintln(os.Stderr, `message must be surrounded by quotation marks (usage: jot write "message")`)
+		return 1
+	}
+
+	text := processWriteText(msgArgs[0], noHyphen)
+	return runLog(text, noHyphen)
+}
+
+func runLog(text string, noHyphen bool) int {
 	if text == "" {
 		fmt.Fprintln(os.Stderr, "message text cannot be empty")
 		return 1
@@ -118,7 +145,11 @@ func runLog(args []string) int {
 		return 1
 	}
 
-	store.Messages = append(store.Messages, Message{Text: text, Time: time.Now()})
+	store.Messages = append(store.Messages, Message{
+		Text:     text,
+		Time:     time.Now(),
+		NoHyphen: noHyphen,
+	})
 	if len(store.Messages) == 1 {
 		store.MainIndex = 0
 	}
@@ -128,11 +159,11 @@ func runLog(args []string) int {
 		return 1
 	}
 
-	fmt.Printf("Logged #%d: %q\n", len(store.Messages)-1, text)
+	fmt.Printf("Wrote #%d: %q\n", len(store.Messages)-1, text)
 	return 0
 }
 
-func runShow(args []string) int {
+func runRead(args []string) int {
 	preview := hasFlag(args, "--preview")
 	gitDir, code := requireGitDir()
 	if code != 0 {
@@ -150,23 +181,38 @@ func runShow(args []string) int {
 	}
 
 	if len(store.Messages) == 0 {
-		fmt.Println("no pending gut notes since the last commit")
+		fmt.Println("no pending jot notes since the last commit")
 		return 0
 	}
 
+	maxPrefix := 0
 	for i, msg := range store.Messages {
-		marker := ""
 		if i == store.MainIndex {
-			marker = " [main]"
+			continue
 		}
-		fmt.Printf("#%d  %s%s  %q\n", i, formatRelativeTime(msg.Time), marker, msg.Text)
+		prefix := fmt.Sprintf("#%d  %s  ", i, formatRelativeTime(msg.Time))
+		if len(prefix) > maxPrefix {
+			maxPrefix = len(prefix)
+		}
+	}
+
+	for i, msg := range store.Messages {
+		timeStr := formatRelativeTime(msg.Time)
+		if i == store.MainIndex {
+			prefix := fmt.Sprintf("#%d  %s [main]  ", i, timeStr)
+			printReadMessageBody(prefix, msg)
+			continue
+		}
+		prefix := fmt.Sprintf("#%d  %s  ", i, timeStr)
+		padded := fmt.Sprintf("%-*s", maxPrefix, prefix)
+		printReadMessageBody(padded, msg)
 	}
 	return 0
 }
 
 func runMain(args []string) int {
 	if len(args) != 1 {
-		fmt.Fprintln(os.Stderr, "usage: gut main <n>")
+		fmt.Fprintln(os.Stderr, "usage: jot main <n>")
 		return 1
 	}
 
@@ -218,7 +264,7 @@ func runCopy(args []string) int {
 
 	formatted, ok := formatCommitMessage(store)
 	if !ok {
-		fmt.Println("no pending gut notes since the last commit")
+		fmt.Println("no pending jot notes since the last commit")
 		return 0
 	}
 
@@ -237,7 +283,7 @@ func runCopy(args []string) int {
 
 func runRemove(args []string) int {
 	if len(args) != 1 {
-		fmt.Fprintln(os.Stderr, "usage: gut rm <n>")
+		fmt.Fprintln(os.Stderr, "usage: jot rm <n>")
 		return 1
 	}
 
@@ -292,7 +338,7 @@ func runRemove(args []string) int {
 
 func runEdit(args []string) int {
 	if len(args) < 2 {
-		fmt.Fprintln(os.Stderr, "usage: gut edit <n> <new text...>")
+		fmt.Fprintln(os.Stderr, "usage: jot edit <n> <new text...>")
 		return 1
 	}
 
@@ -370,7 +416,7 @@ func runClear(args []string) int {
 	}
 
 	if len(store.Messages) == 0 {
-		fmt.Println("no pending gut notes since the last commit")
+		fmt.Println("no pending jot notes since the last commit")
 		return 0
 	}
 
@@ -426,7 +472,7 @@ func runPostCommitClear() int {
 func printFormatted(store Store) int {
 	formatted, ok := formatCommitMessage(store)
 	if !ok {
-		fmt.Println("no pending gut notes since the last commit")
+		fmt.Println("no pending jot notes since the last commit")
 		return 0
 	}
 	fmt.Println(formatted)
@@ -465,26 +511,28 @@ func hasFlag(args []string, flag string) bool {
 }
 
 func printHelp() {
-	fmt.Printf(`gut %s — commit-message journal
+	fmt.Printf(`jot %s — commit-message journal
 
 Usage:
-  gut "<message>"          Log a note (multiple words without quotes are joined)
-  gut show                 List pending notes
-  gut show --preview       Print formatted commit message without clipboard
-  gut main <n>             Set which note becomes the commit subject line
-  gut copy                 Format and copy commit message to clipboard
-  gut copy --preview       Print formatted commit message without clipboard
-  gut -c                   Alias for gut copy
-  gut rm <n>               Remove note at index n
-  gut remove <n>           Alias for gut rm
-  gut edit <n> <text...>   Replace note text at index n
-  gut undo                 Remove the most recently added note
-  gut clear                Wipe all pending notes (prompts unless -y/--yes)
-  gut init                 Install or repair the post-commit hook
-  gut help                 Show this help
-  gut version              Print version
+  jot write "message"      Log a note (supports multi-line quoted text)
+  jot write --no-hyphen "message"
+                           Log without auto-hyphens on sub-lines (copy always uses them)
+  jot read                 List pending notes
+  jot read --preview       Print formatted commit message without clipboard
+  jot main <n>             Set which note becomes the commit subject line
+  jot copy                 Format and copy commit message to clipboard
+  jot copy --preview       Print formatted commit message without clipboard
+  jot -c                   Alias for jot copy
+  jot rm <n>               Remove note at index n
+  jot remove <n>           Alias for jot rm
+  jot edit <n> <text...>   Replace note text at index n
+  jot undo                 Remove the most recently added note
+  jot clear                Wipe all pending notes (prompts unless -y/--yes)
+  jot init                 Install or repair the post-commit hook
+  jot help                 Show this help
+  jot version              Print version
 
-Notes are stored per-repo in .git/gut/log.json and cleared automatically
+Notes are stored per-repo in .git/jot/log.json and cleared automatically
 after each successful commit via the post-commit hook.
 `, version)
 }

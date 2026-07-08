@@ -1,7 +1,6 @@
 package main
 
 import (
-	"strings"
 	"testing"
 	"time"
 )
@@ -10,10 +9,10 @@ func TestFormatCommitMessage(t *testing.T) {
 	now := time.Now()
 
 	tests := []struct {
-		name    string
-		store   Store
-		want    string
-		wantOK  bool
+		name   string
+		store  Store
+		want   string
+		wantOK bool
 	}{
 		{
 			name:   "empty store",
@@ -27,7 +26,7 @@ func TestFormatCommitMessage(t *testing.T) {
 				Messages:  []Message{{Text: "Only subject", Time: now}},
 				MainIndex: 0,
 			},
-			want:   "Only subject",
+			want:   `"Only subject"`,
 			wantOK: true,
 		},
 		{
@@ -40,7 +39,7 @@ func TestFormatCommitMessage(t *testing.T) {
 				},
 				MainIndex: 0,
 			},
-			want:   "Subject line\n\n- Detail one\n- Detail two",
+			want:   "\"Subject line\n- Detail one\n- Detail two\"",
 			wantOK: true,
 		},
 		{
@@ -52,7 +51,33 @@ func TestFormatCommitMessage(t *testing.T) {
 				},
 				MainIndex: 1,
 			},
-			want:   "Refactored pipeline\n\n- Added circles",
+			want:   "\"Refactored pipeline\n- Added circles\"",
+			wantOK: true,
+		},
+		{
+			name: "multi-line main with other messages",
+			store: Store{
+				Messages: []Message{
+					{Text: "Testing this out\n- added some nice things\n- each new thing is now cooler than before", Time: now},
+					{Text: "Updated jot message command", Time: now},
+					{Text: "Updated README file", Time: now},
+				},
+				MainIndex: 0,
+			},
+			want: "\"Testing this out\n- added some nice things\n- each new thing is now cooler than before\n- Updated jot message command\n- Updated README file\"",
+			wantOK: true,
+		},
+		{
+			name: "single-line main with multi-line other",
+			store: Store{
+				Messages: []Message{
+					{Text: "Updated jot message command", Time: now},
+					{Text: "Testing this out\n- added some nice things\n- each new thing is now cooler than before", Time: now},
+					{Text: "Updated README file", Time: now},
+				},
+				MainIndex: 0,
+			},
+			want: "\"Updated jot message command\n- Testing this out\n- added some nice things\n- each new thing is now cooler than before\n- Updated README file\"",
 			wantOK: true,
 		},
 	}
@@ -63,9 +88,23 @@ func TestFormatCommitMessage(t *testing.T) {
 			if ok != tt.wantOK {
 				t.Fatalf("ok = %v, want %v", ok, tt.wantOK)
 			}
-			if strings.TrimSpace(got) != strings.TrimSpace(tt.want) {
+			if got != tt.want {
 				t.Fatalf("got %q, want %q", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestProcessWriteText(t *testing.T) {
+	got := processWriteText("Testing this out\nadded some nice things\neach new thing is now cooler than before", false)
+	want := "Testing this out\n- added some nice things\n- each new thing is now cooler than before"
+	if got != want {
+		t.Fatalf("got %q, want %q", got, want)
+	}
+
+	gotNoHyphen := processWriteText("Testing this out\nadded some nice things", true)
+	wantNoHyphen := "Testing this out\nadded some nice things"
+	if gotNoHyphen != wantNoHyphen {
+		t.Fatalf("got %q, want %q", gotNoHyphen, wantNoHyphen)
 	}
 }

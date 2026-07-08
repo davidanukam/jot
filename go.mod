@@ -1,3 +1,3 @@
-module gut
+module jot
 
 go 1.22

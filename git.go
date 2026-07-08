@@ -9,9 +9,10 @@ import (
 )
 
 const (
-	hookMarker     = "gut _post-commit-clear"
-	hookBlockStart = "# >>> gut hook >>>"
-	hookBlockEnd   = "# <<< gut hook <<<"
+	hookMarker     = "jot _post-commit-clear"
+	hookBlockStart = "# >>> jot hook >>>"
+	hookBlockEnd   = "# <<< jot hook <<<"
+	legacyHookMarker = "gut _post-commit-clear"
 )
 
 func gitDir() (string, error) {
@@ -37,11 +38,11 @@ func hookPath(gitDir string) string {
 }
 
 func hookInstalled(content string) bool {
-	return strings.Contains(content, hookMarker)
+	return strings.Contains(content, hookMarker) || strings.Contains(content, legacyHookMarker)
 }
 
 func hookInvocation() string {
-	return "command -v gut >/dev/null 2>&1 && gut _post-commit-clear"
+	return "command -v jot >/dev/null 2>&1 && jot _post-commit-clear"
 }
 
 func freshHookContent() string {
@@ -102,7 +103,7 @@ func ensureHook(gitDir string) error {
 	}
 	switch result {
 	case hookInstalledFresh, hookAppended:
-		fmt.Println("(installed gut's post-commit hook in this repo)")
+		fmt.Println("(installed jot's post-commit hook in this repo)")
 	}
 	return nil
 }
@@ -112,7 +113,7 @@ func initHookMessage(result hookInstallResult) string {
 	case hookInstalledFresh:
 		return "installed fresh post-commit hook"
 	case hookAppended:
-		return "appended gut invocation to existing post-commit hook"
+		return "appended jot invocation to existing post-commit hook"
 	default:
 		return "post-commit hook already present"
 	}

@@ -1,4 +1,4 @@
-# Gut
+# Jot
 
 A commit-message journal CLI. Jot short notes as you work; assemble them into a
 properly formatted commit message right before `git commit`.
@@ -6,7 +6,7 @@ properly formatted commit message right before `git commit`.
 ## Install
 
 ```sh
-go build -o gut .
+go build -o jot .
 ```
 
 Put the binary on your `PATH` (e.g. copy it to `~/bin` or `/usr/local/bin`).
@@ -14,9 +14,9 @@ Put the binary on your `PATH` (e.g. copy it to `~/bin` or `/usr/local/bin`).
 Cross-compile without network access:
 
 ```sh
-GOOS=linux GOARCH=amd64 go build -o gut .
-GOOS=darwin GOARCH=arm64 go build -o gut .
-GOOS=windows GOARCH=amd64 go build -o gut.exe .
+GOOS=linux GOARCH=amd64 go build -o jot .
+GOOS=darwin GOARCH=arm64 go build -o jot .
+GOOS=windows GOARCH=amd64 go build -o jot.exe .
 ```
 
 ## Refined flow
@@ -26,44 +26,46 @@ GOOS=windows GOARCH=amd64 go build -o gut.exe .
 cd my-project
 
 # Log notes as you go (hook installs automatically on first use)
-gut "Added a new function to render circles"
-gut "Refactored main pipeline and packages"
+jot write "Added a new function to render circles"
+jot write "Refactored main pipeline and packages"
 
 # Review what's pending
-gut show
+jot read
 
 # Pick which note becomes the commit subject
-gut main 1
+jot main 1
 
 # Copy formatted message to clipboard (also prints to stdout)
-gut copy
+jot copy
 
 # Commit using the formatted message
-git commit -m "$(gut copy --preview)"
+git commit -m "$(jot copy --preview)"
 
 # After commit, notes are cleared automatically by the post-commit hook
-gut show   # → no pending gut notes since the last commit
+jot read   # → no pending jot notes since the last commit
 ```
 
 ## Commands
 
 | Command | Description |
 |---------|-------------|
-| `gut "<message>"` | Log a note |
-| `gut show` | List pending notes with timestamps |
-| `gut main <n>` | Set subject line (index from `show`) |
-| `gut copy` / `gut -c` | Format and copy to clipboard |
-| `gut copy --preview` | Print formatted message only |
-| `gut rm <n>` | Remove a note |
-| `gut edit <n> <text>` | Edit a note in place |
-| `gut undo` | Remove the last note |
-| `gut clear` | Wipe all notes (`-y` to skip prompt) |
-| `gut init` | Install/repair the post-commit hook |
+| `jot write "message"` | Log a note (multi-line quoted text supported) |
+| `jot write --no-hyphen "message"` | Log multi-line without auto-hyphens on sub-lines |
+| `jot read` | List pending notes with timestamps |
+| `jot main <n>` | Set subject line (index from `read`) |
+| `jot copy` / `jot -c` | Format and copy to clipboard |
+| `jot copy --preview` | Print formatted message only |
+| `jot rm <n>` | Remove a note |
+| `jot edit <n> <text>` | Edit a note in place |
+| `jot undo` | Remove the last note |
+| `jot clear` | Wipe all notes (`-y` to skip prompt) |
+| `jot init` | Install/repair the post-commit hook |
 
 ## Storage
 
-Notes live at `<git-dir>/gut/log.json` (inside `.git/`, never tracked). Each
-git worktree gets its own log.
+Notes live at `<git-dir>/jot/log.json` (inside `.git/`, never tracked). Each
+git worktree gets its own log. Legacy data at `.git/gut/log.json` is read
+automatically if present.
 
 ## Clipboard
 

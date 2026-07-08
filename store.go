@@ -9,8 +9,9 @@ import (
 )
 
 type Message struct {
-	Text string    `json:"text"`
-	Time time.Time `json:"time"`
+	Text     string    `json:"text"`
+	Time     time.Time `json:"time"`
+	NoHyphen bool      `json:"no_hyphen,omitempty"`
 }
 
 type Store struct {
@@ -19,7 +20,7 @@ type Store struct {
 }
 
 func storePath(gitDir string) string {
-	return filepath.Join(gitDir, "gut", "log.json")
+	return filepath.Join(gitDir, "jot", "log.json")
 }
 
 func loadStore(gitDir string) (Store, error) {
@@ -27,9 +28,17 @@ func loadStore(gitDir string) (Store, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return Store{MainIndex: 0}, nil
+			legacy := filepath.Join(gitDir, "gut", "log.json")
+			data, err = os.ReadFile(legacy)
+			if err != nil {
+				if os.IsNotExist(err) {
+					return Store{MainIndex: 0}, nil
+				}
+				return Store{}, fmt.Errorf("read store: %w", err)
+			}
+		} else {
+			return Store{}, fmt.Errorf("read store: %w", err)
 		}
-		return Store{}, fmt.Errorf("read store: %w", err)
 	}
 
 	var store Store
