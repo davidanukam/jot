@@ -47,6 +47,9 @@ jot update
 jot copy
 jot paste
 
+# Push to remote (e.g. first push to a new branch)
+jot push -u origin main
+
 # After commit, pending notes are cleared automatically
 jot read   # → No messages have been made for the next commit
 
@@ -74,6 +77,7 @@ jot version
 | `jot paste` | Copy to clipboard and `git commit` |
 | `jot paste -p` | Preview message, confirm `[y/N]`, then copy and commit |
 | `jot update` | Stage all changes (`git add .`) |
+| `jot push` | Push to remote (`git push` passthrough) |
 | `jot rm <n>` | Remove a note |
 | `jot edit <n> <text>` | Edit a note in place |
 | `jot undo` | Remove the last note |

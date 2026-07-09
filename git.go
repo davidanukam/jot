@@ -175,6 +175,22 @@ func runGitAdd() int {
 	return 0
 }
 
+func runGitPush(args []string) int {
+	gitArgs := append([]string{"push"}, args...)
+	cmd := exec.Command("git", gitArgs...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Stdin = os.Stdin
+	if err := cmd.Run(); err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			return exitErr.ExitCode()
+		}
+		fmt.Fprintf(os.Stderr, "git push: %v\n", err)
+		return 1
+	}
+	return 0
+}
+
 func gitCommit(message string) int {
 	cmd := exec.Command("git", "commit", "-m", message)
 	cmd.Stdout = os.Stdout

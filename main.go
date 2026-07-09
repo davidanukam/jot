@@ -20,6 +20,7 @@ var reservedCommands = map[string]bool{
 	"copy":              true,
 	"paste":             true,
 	"update":            true,
+	"push":              true,
 	"rm":                true,
 	"remove":            true,
 	"edit":              true,
@@ -79,6 +80,8 @@ func dispatch(args []string) int {
 		return runPaste(args[1:])
 	case "update":
 		return runUpdate()
+	case "push":
+		return runJotPush(args[1:])
 	case "main":
 		return runMain(args[1:])
 	case "rm", "remove":
@@ -553,6 +556,13 @@ func runUpdate() int {
 	return runGitAdd()
 }
 
+func runJotPush(args []string) int {
+	if _, code := requireGitDir(); code != 0 {
+		return code
+	}
+	return runGitPush(args)
+}
+
 func printFormatted(store Store) int {
 	formatted, ok := formatCommitMessage(store)
 	if !ok {
@@ -593,6 +603,7 @@ Usage:
   jot paste                Copy message to clipboard and git commit
   jot paste -p             Preview message, confirm, then copy and commit
   jot update               Stage all changes (runs git add .)
+  jot push                 Push to remote (runs git push; pass any git push flags)
   jot rm <n>               Remove note at index n
   jot remove <n>           Alias for jot rm
   jot edit <n> <text...>   Replace note text at index n
