@@ -108,6 +108,21 @@ func ensureHook(gitDir string) error {
 	return nil
 }
 
+func gitCommit(message string) int {
+	cmd := exec.Command("git", "commit", "-m", message)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Stdin = os.Stdin
+	if err := cmd.Run(); err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			return exitErr.ExitCode()
+		}
+		fmt.Fprintf(os.Stderr, "git commit: %v\n", err)
+		return 1
+	}
+	return 0
+}
+
 func initHookMessage(result hookInstallResult) string {
 	switch result {
 	case hookInstalledFresh:

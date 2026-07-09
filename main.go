@@ -15,6 +15,7 @@ var reservedCommands = map[string]bool{
 	"read":              true,
 	"main":              true,
 	"copy":              true,
+	"paste":             true,
 	"rm":                true,
 	"remove":            true,
 	"edit":              true,
@@ -68,6 +69,8 @@ func dispatch(args []string) int {
 		return runRead(args[1:])
 	case "copy":
 		return runCopy(args[1:])
+	case "paste":
+		return runPaste(args[1:])
 	case "main":
 		return runMain(args[1:])
 	case "rm", "remove":
@@ -246,6 +249,57 @@ func runMain(args []string) int {
 
 	fmt.Printf("main message set to #%d\n", n)
 	return 0
+}
+
+func runPaste(args []string) int {
+	preview := hasFlag(args, "-p") || hasFlag(args, "--preview")
+
+	gitDir, code := requireGitDir()
+	if code != 0 {
+		return code
+	}
+
+	store, err := loadStore(gitDir)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err.Error())
+		return 1
+	}
+
+	formatted, ok := formatCommitMessage(store)
+	if !ok {
+		fmt.Println("no pending jot notes since the last commit")
+		return 0
+	}
+
+	fmt.Println(formatted)
+
+	if preview {
+		fmt.Print("commit with this message? [y/N] ")
+		reader := bufio.NewReader(os.Stdin)
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "read confirmation:", err)
+			return 1
+		}
+		answer := strings.ToLower(strings.TrimSpace(line))
+		if answer != "y" && answer != "yes" {
+			fmt.Println("cancelled")
+			return 0
+		}
+	}
+
+	if err := copyToClipboard(formatted); err != nil {
+		fmt.Fprintf(os.Stderr, "clipboard: %v\n", err)
+		fmt.Fprintln(os.Stderr, "message was printed above; install a clipboard tool or copy it manually")
+	}
+
+	message, ok := commitMessageForGit(store)
+	if !ok {
+		fmt.Println("no pending jot notes since the last commit")
+		return 0
+	}
+
+	return gitCommit(message)
 }
 
 func runCopy(args []string) int {
@@ -523,6 +577,8 @@ Usage:
   jot copy                 Format and copy commit message to clipboard
   jot copy --preview       Print formatted commit message without clipboard
   jot -c                   Alias for jot copy
+  jot paste                Copy message to clipboard and git commit
+  jot paste -p             Preview message, confirm, then copy and commit
   jot rm <n>               Remove note at index n
   jot remove <n>           Alias for jot rm
   jot edit <n> <text...>   Replace note text at index n

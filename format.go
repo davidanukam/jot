@@ -38,6 +38,18 @@ func formatCommitMessage(store Store) (string, bool) {
 	return formatQuotedCommit(subject, bullets)
 }
 
+// commitMessageForGit returns the formatted commit message without shell quoting.
+func commitMessageForGit(store Store) (string, bool) {
+	formatted, ok := formatCommitMessage(store)
+	if !ok {
+		return "", false
+	}
+	if len(formatted) >= 2 && formatted[0] == '"' && formatted[len(formatted)-1] == '"' {
+		return formatted[1 : len(formatted)-1], true
+	}
+	return formatted, true
+}
+
 func formatQuotedCommit(subject string, bullets []string) (string, bool) {
 	if len(bullets) == 0 {
 		return `"` + subject + `"`, true

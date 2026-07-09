@@ -38,7 +38,11 @@ jot main 1
 # Copy formatted message to clipboard (also prints to stdout)
 jot copy
 
-# Commit using the formatted message
+# Copy and commit in one step (preview with -p to confirm first)
+jot paste
+jot paste -p
+
+# Or commit manually using the formatted message
 git commit -m "$(jot copy --preview)"
 
 # After commit, notes are cleared automatically by the post-commit hook
@@ -55,6 +59,8 @@ jot read   # → no pending jot notes since the last commit
 | `jot main <n>` | Set subject line (index from `read`) |
 | `jot copy` / `jot -c` | Format and copy to clipboard |
 | `jot copy --preview` | Print formatted message only |
+| `jot paste` | Copy to clipboard and `git commit` |
+| `jot paste -p` | Preview message, confirm `[y/N]`, then copy and commit |
 | `jot rm <n>` | Remove a note |
 | `jot edit <n> <text>` | Edit a note in place |
 | `jot undo` | Remove the last note |

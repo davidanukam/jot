@@ -95,6 +95,26 @@ func TestFormatCommitMessage(t *testing.T) {
 	}
 }
 
+func TestCommitMessageForGit(t *testing.T) {
+	now := time.Now()
+	store := Store{
+		Messages: []Message{
+			{Text: "Subject line", Time: now},
+			{Text: "Detail one", Time: now},
+		},
+		MainIndex: 0,
+	}
+
+	got, ok := commitMessageForGit(store)
+	if !ok {
+		t.Fatal("expected ok")
+	}
+	want := "Subject line\n- Detail one"
+	if got != want {
+		t.Fatalf("got %q, want %q", got, want)
+	}
+}
+
 func TestProcessWriteText(t *testing.T) {
 	got := processWriteText("Testing this out\nadded some nice things\neach new thing is now cooler than before", false)
 	want := "Testing this out\n- added some nice things\n- each new thing is now cooler than before"
