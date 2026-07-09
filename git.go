@@ -42,7 +42,13 @@ func hookInstalled(content string) bool {
 }
 
 func hookInvocation() string {
-	return "command -v jot >/dev/null 2>&1 && jot _post-commit-clear"
+	exe, err := os.Executable()
+	if err != nil {
+		return "jot _post-commit-clear 2>/dev/null || true"
+	}
+	exe = filepath.ToSlash(exe)
+	quoted := "'" + strings.ReplaceAll(exe, "'", `'\''`) + "'"
+	return quoted + " _post-commit-clear 2>/dev/null || true"
 }
 
 func freshHookContent() string {
@@ -86,6 +92,13 @@ func installHook(gitDir string) (hookInstallResult, error) {
 
 	content := string(existing)
 	if hookInstalled(content) {
+		updated, changed := refreshHookInvocation(content)
+		if changed {
+			if err := os.WriteFile(path, []byte(updated), 0755); err != nil {
+				return hookAlreadyPresent, fmt.Errorf("update post-commit hook: %w", err)
+			}
+			return hookAppended, nil
+		}
 		return hookAlreadyPresent, nil
 	}
 
@@ -106,6 +119,60 @@ func ensureHook(gitDir string) error {
 		fmt.Println("(installed jot's post-commit hook in this repo)")
 	}
 	return nil
+}
+
+func refreshHookInvocation(content string) (string, bool) {
+	want := hookInvocation()
+	lines := strings.Split(content, "\n")
+	changed := false
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if strings.Contains(trimmed, hookMarker) || strings.Contains(trimmed, legacyHookMarker) {
+			if trimmed != want {
+				lines[i] = want
+				changed = true
+			}
+		}
+	}
+	if !changed {
+		return content, false
+	}
+	result := strings.Join(lines, "\n")
+	if strings.HasSuffix(content, "\n") && !strings.HasSuffix(result, "\n") {
+		result += "\n"
+	}
+	return result, true
+}
+
+func runGitLog(args []string) int {
+	gitArgs := append([]string{"log"}, args...)
+	cmd := exec.Command("git", gitArgs...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Stdin = os.Stdin
+	if err := cmd.Run(); err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			return exitErr.ExitCode()
+		}
+		fmt.Fprintf(os.Stderr, "git log: %v\n", err)
+		return 1
+	}
+	return 0
+}
+
+func runGitAdd() int {
+	cmd := exec.Command("git", "add", ".")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Stdin = os.Stdin
+	if err := cmd.Run(); err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			return exitErr.ExitCode()
+		}
+		fmt.Fprintf(os.Stderr, "git add: %v\n", err)
+		return 1
+	}
+	return 0
 }
 
 func gitCommit(message string) int {

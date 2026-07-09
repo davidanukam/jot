@@ -11,11 +11,15 @@ import (
 
 const version = "0.1.0"
 
+const noPendingMessages = "No messages have been made for the next commit"
+
 var reservedCommands = map[string]bool{
 	"read":              true,
+	"log":               true,
 	"main":              true,
 	"copy":              true,
 	"paste":             true,
+	"update":            true,
 	"rm":                true,
 	"remove":            true,
 	"edit":              true,
@@ -67,10 +71,14 @@ func dispatch(args []string) int {
 		return 0
 	case "read":
 		return runRead(args[1:])
+	case "log":
+		return runJotLog(args[1:])
 	case "copy":
 		return runCopy(args[1:])
 	case "paste":
 		return runPaste(args[1:])
+	case "update":
+		return runUpdate()
 	case "main":
 		return runMain(args[1:])
 	case "rm", "remove":
@@ -123,10 +131,10 @@ func runWrite(args []string) int {
 	}
 
 	text := processWriteText(msgArgs[0], noHyphen)
-	return runLog(text, noHyphen)
+	return appendMessage(text, noHyphen)
 }
 
-func runLog(text string, noHyphen bool) int {
+func appendMessage(text string, noHyphen bool) int {
 	if text == "" {
 		fmt.Fprintln(os.Stderr, "message text cannot be empty")
 		return 1
@@ -184,7 +192,7 @@ func runRead(args []string) int {
 	}
 
 	if len(store.Messages) == 0 {
-		fmt.Println("no pending jot notes since the last commit")
+		fmt.Println(noPendingMessages)
 		return 0
 	}
 
@@ -193,14 +201,14 @@ func runRead(args []string) int {
 		if i == store.MainIndex {
 			continue
 		}
-		prefix := fmt.Sprintf("#%d  %s  ", i, formatRelativeTime(msg.Time))
+		prefix := fmt.Sprintf("#%d  %s  ", i, formatGitLogDate(msg.Time))
 		if len(prefix) > maxPrefix {
 			maxPrefix = len(prefix)
 		}
 	}
 
 	for i, msg := range store.Messages {
-		timeStr := formatRelativeTime(msg.Time)
+		timeStr := formatGitLogDate(msg.Time)
 		if i == store.MainIndex {
 			prefix := fmt.Sprintf("#%d  %s [main]  ", i, timeStr)
 			printReadMessageBody(prefix, msg)
@@ -267,7 +275,7 @@ func runPaste(args []string) int {
 
 	formatted, ok := formatCommitMessage(store)
 	if !ok {
-		fmt.Println("no pending jot notes since the last commit")
+		fmt.Println(noPendingMessages)
 		return 0
 	}
 
@@ -295,11 +303,19 @@ func runPaste(args []string) int {
 
 	message, ok := commitMessageForGit(store)
 	if !ok {
-		fmt.Println("no pending jot notes since the last commit")
+		fmt.Println(noPendingMessages)
 		return 0
 	}
 
-	return gitCommit(message)
+	code = gitCommit(message)
+	if code != 0 {
+		return code
+	}
+	if err := clearStore(gitDir); err != nil {
+		fmt.Fprintln(os.Stderr, err.Error())
+		return 1
+	}
+	return 0
 }
 
 func runCopy(args []string) int {
@@ -318,7 +334,7 @@ func runCopy(args []string) int {
 
 	formatted, ok := formatCommitMessage(store)
 	if !ok {
-		fmt.Println("no pending jot notes since the last commit")
+		fmt.Println(noPendingMessages)
 		return 0
 	}
 
@@ -470,7 +486,7 @@ func runClear(args []string) int {
 	}
 
 	if len(store.Messages) == 0 {
-		fmt.Println("no pending jot notes since the last commit")
+		fmt.Println(noPendingMessages)
 		return 0
 	}
 
@@ -523,36 +539,32 @@ func runPostCommitClear() int {
 	return 0
 }
 
+func runJotLog(args []string) int {
+	if _, code := requireGitDir(); code != 0 {
+		return code
+	}
+	return runGitLog(args)
+}
+
+func runUpdate() int {
+	if _, code := requireGitDir(); code != 0 {
+		return code
+	}
+	return runGitAdd()
+}
+
 func printFormatted(store Store) int {
 	formatted, ok := formatCommitMessage(store)
 	if !ok {
-		fmt.Println("no pending jot notes since the last commit")
+		fmt.Println(noPendingMessages)
 		return 0
 	}
 	fmt.Println(formatted)
 	return 0
 }
 
-func formatRelativeTime(t time.Time) string {
-	elapsed := time.Since(t)
-	if elapsed < time.Minute {
-		return "just now"
-	}
-	if elapsed < time.Hour {
-		m := int(elapsed / time.Minute)
-		if m == 1 {
-			return "1m ago"
-		}
-		return fmt.Sprintf("%dm ago", m)
-	}
-	if elapsed < 24*time.Hour {
-		h := int(elapsed / time.Hour)
-		if h == 1 {
-			return "1h ago"
-		}
-		return fmt.Sprintf("%dh ago", h)
-	}
-	return t.Format("2006-01-02 15:04")
+func formatGitLogDate(t time.Time) string {
+	return t.Format("Mon Jan 2 15:04:05 2006 -0700")
 }
 
 func hasFlag(args []string, flag string) bool {
@@ -571,14 +583,16 @@ Usage:
   jot write "message"      Log a note (supports multi-line quoted text)
   jot write --no-hyphen "message"
                            Log without auto-hyphens on sub-lines (copy always uses them)
-  jot read                 List pending notes
+  jot read                 List pending notes for the next commit
   jot read --preview       Print formatted commit message without clipboard
+  jot log                  Show past commit messages (runs git log)
   jot main <n>             Set which note becomes the commit subject line
   jot copy                 Format and copy commit message to clipboard
   jot copy --preview       Print formatted commit message without clipboard
   jot -c                   Alias for jot copy
   jot paste                Copy message to clipboard and git commit
   jot paste -p             Preview message, confirm, then copy and commit
+  jot update               Stage all changes (runs git add .)
   jot rm <n>               Remove note at index n
   jot remove <n>           Alias for jot rm
   jot edit <n> <text...>   Replace note text at index n

@@ -29,8 +29,11 @@ cd my-project
 jot write "Added a new function to render circles"
 jot write "Refactored main pipeline and packages"
 
-# Review what's pending
+# Review what's pending for the next commit
 jot read
+
+# Review past commits (same as git log)
+jot log
 
 # Pick which note becomes the commit subject
 jot main 1
@@ -46,7 +49,7 @@ jot paste -p
 git commit -m "$(jot copy --preview)"
 
 # After commit, notes are cleared automatically by the post-commit hook
-jot read   # → no pending jot notes since the last commit
+jot read   # → No messages have been made for the next commit
 ```
 
 ## Commands
@@ -55,12 +58,14 @@ jot read   # → no pending jot notes since the last commit
 |---------|-------------|
 | `jot write "message"` | Log a note (multi-line quoted text supported) |
 | `jot write --no-hyphen "message"` | Log multi-line without auto-hyphens on sub-lines |
-| `jot read` | List pending notes with timestamps |
+| `jot read` | List pending notes for the next commit (git-log-style dates) |
+| `jot log` | Show past commit messages (`git log` passthrough) |
 | `jot main <n>` | Set subject line (index from `read`) |
 | `jot copy` / `jot -c` | Format and copy to clipboard |
 | `jot copy --preview` | Print formatted message only |
 | `jot paste` | Copy to clipboard and `git commit` |
 | `jot paste -p` | Preview message, confirm `[y/N]`, then copy and commit |
+| `jot update` | Stage all changes (`git add .`) |
 | `jot rm <n>` | Remove a note |
 | `jot edit <n> <text>` | Edit a note in place |
 | `jot undo` | Remove the last note |
