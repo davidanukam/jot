@@ -25,31 +25,39 @@ GOOS=windows GOARCH=amd64 go build -o jot.exe .
 # Start working in a repo
 cd my-project
 
-# Log notes as you go (hook installs automatically on first use)
+# Set up the post-commit hook (optional; first jot write installs it too)
+jot init
+
+# Log notes as you go
 jot write "Added a new function to render circles"
+jot write "typo note"
+jot undo
 jot write "Refactored main pipeline and packages"
 
 # Review what's pending for the next commit
 jot read
 
-# Review past commits (same as git log)
+# Tweak notes before committing
+jot edit 0 "Added circle rendering helper"
+jot main 1
+jot rm 0
+
+# Stage, copy, and commit
+jot update
+jot copy
+jot paste
+
+# After commit, pending notes are cleared automatically
+jot read   # → No messages have been made for the next commit
+
+# Browse past commits
 jot log
 
-# Pick which note becomes the commit subject
-jot main 1
+# Drop pending notes without committing
+jot clear
 
-# Copy formatted message to clipboard (also prints to stdout)
-jot copy
-
-# Copy and commit in one step (preview with -p to confirm first)
-jot paste
-jot paste -p
-
-# Or commit manually using the formatted message
-git commit -m "$(jot copy --preview)"
-
-# After commit, notes are cleared automatically by the post-commit hook
-jot read   # → No messages have been made for the next commit
+jot help
+jot version
 ```
 
 ## Commands
